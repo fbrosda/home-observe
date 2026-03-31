@@ -1,0 +1,11 @@
+#+title: Home Observability
+
+The project contains different components, to collect and monitor the following systems installed in my home:
+
+- Kostal Plenticore PV Inverter
+- IDM Heatpump
+- Airvisio
+
+There is a guile module, which connects to the different devices, via the available apis and collects the data, which is written into a timescaledb.
+
+The grafana folder contains the configs for various dashboards generated from the collected data.
