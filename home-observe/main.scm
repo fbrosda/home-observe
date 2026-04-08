@@ -8,5 +8,5 @@
   (with-input-from-file path  read))
 
 (define (main args)
-  (let ((cfg (read-config "./home-observe.cfg")))
+  (let ((cfg (read-config)))
     (plenticore:observe (assoc-ref cfg "plenticore"))))
