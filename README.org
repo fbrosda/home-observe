@@ -9,3 +9,55 @@ The project contains different components, to collect and monitor the following 
 There is a guile module, which connects to the different devices, via the available apis and collects the data, which is written into a timescaledb.
 
 The grafana folder contains the configs for various dashboards generated from the collected data.
+
+* TimescaleDB Setup
+
+[[https://docs2.tigerdata.com/docs/get-started/choose-your-path/install-timescaledb][Official Documentation]]
+
+** Plenticore Table
+
+#+begin_src sql
+CREATE TABLE IF NOT EXISTS plenticore (
+  time        TIMESTAMPTZ NOT NULL,
+    
+  home_p double precision not null,
+  home_p_pv double precision not null,
+  home_p_bat double precision not null,
+  home_p_grid double precision not null,
+  
+  iv_state smallint not null,
+  iv_limit double precision not null,
+  iv_em_state smallint not null,
+  iv_digi_in bit(4) not null,
+  iv_p double precision not null,
+  iv_freq double precision not null,
+  iv_cosphi double precision not null,
+  iv_l1_u double precision not null,
+  iv_l1_i double precision not null,
+  iv_l1_p double precision not null,
+  iv_l2_u double precision not null,
+  iv_l2_i double precision not null,
+  iv_l2_p double precision not null,
+  iv_l3_u double precision not null,
+  iv_l3_i double precision not null,
+  iv_l3_p double precision not null,
+  
+  pv1_u double precision not null,
+  pv1_i double precision not null,
+  pv1_p double precision not null,
+  
+  pv2_u double precision not null,
+  pv2_i double precision not null,
+  pv2_p double precision not null,
+  
+  bat_u double precision not null,
+  bat_i double precision not null,
+  bat_p double precision not null,
+  bat_soc smallint not null,
+  bat_cycles integer not null,
+
+  grid_state boolean not null,
+  grid_p double precision not null
+) WITH (timescaledb.hypertable);
+#+end_src
+

@@ -128,11 +128,68 @@
                "value")))
 
 (define (storedata handle data)
-  (let ((home-p (get-field data "devices:local" "Home_P")))
-    (dbi-query handle (format #f "insert into plenticore (home_p) values (~s)" home-p))))
+  ;; (format #t "~s~%" data)
+  (let* ((home-p (get-field data "devices:local" "Home_P"))
+         (home-p-pv (get-field data "devices:local" "HomePv_P"))
+         (home-p-bat (get-field data "devices:local" "HomeBat_P"))
+         (home-p-grid (get-field data "devices:local" "HomeGrid_P"))
+
+         (iv-state (get-field data "devices:local" "Inverter:State"))
+         (iv-limit (get-field data "devices:local" "LimitEvuAbs"))
+         (iv-em-state (get-field data "devices:local" "EM_State"))
+         (iv-digi-in (get-field data "devices:local" "DigitalIn"))
+         (iv-p (get-field data "devices:local:ac" "P"))
+         (iv-freq (get-field data "devices:local:ac" "Frequency"))
+         (iv-cosphi (get-field data "devices:local:ac" "CosPhi"))
+
+         (iv-l1-u (get-field data "devices:local:ac" "L1_U"))
+         (iv-l1-i (get-field data "devices:local:ac" "L1_I"))
+         (iv-l1-p (get-field data "devices:local:ac" "L1_P"))
+         (iv-l2-u (get-field data "devices:local:ac" "L2_U"))
+         (iv-l2-i (get-field data "devices:local:ac" "L2_I"))
+         (iv-l2-p (get-field data "devices:local:ac" "L2_P"))
+         (iv-l3-u (get-field data "devices:local:ac" "L3_U"))
+         (iv-l3-i (get-field data "devices:local:ac" "L3_I"))
+         (iv-l3-p (get-field data "devices:local:ac" "L3_P"))
+
+         (pv1-u (get-field data "devices:local:pv1" "U"))
+         (pv1-i (get-field data "devices:local:pv1" "I"))
+         (pv1-p (get-field data "devices:local:pv1" "P"))
+         (pv2-u (get-field data "devices:local:pv2" "U"))
+         (pv2-i (get-field data "devices:local:pv2" "I"))
+         (pv2-p (get-field data "devices:local:pv2" "P"))
+
+         (bat-u (get-field data "devices:local:battery" "U"))
+         (bat-i (get-field data "devices:local:battery" "I"))
+         (bat-p (get-field data "devices:local:battery" "P"))
+         (bat-soc (get-field data "devices:local:battery" "SoC"))
+         (bat-cycles (get-field data "devices:local:battery" "Cycles"))
+
+         (grid-p (- iv-p home-p)))
+    (dbi-query handle (format #f "insert into plenticore (time,
+home_p, home_p_pv, home_p_bat, home_p_grid,
+iv_state, iv_limit, iv_em_state, iv_digi_in, iv_p, iv_freq, iv_cosphi,
+iv_l1_u, iv_l1_i, iv_l1_p, iv_l2_u, iv_l2_i, iv_l2_p, iv_l3_u, iv_l3_i, iv_l3_p,
+pv1_u, pv1_i, pv1_p, pv2_u, pv2_i, pv2_p,
+bat_u, bat_i, bat_p, bat_soc, bat_cycles,
+grid_p
+) values (now(),
+~s, ~s, ~s, ~s,
+~s, ~s, ~s, ~s::bit(4), ~s, ~s, ~s,
+~s, ~s, ~s, ~s, ~s, ~s, ~s, ~s, ~s,
+~s, ~s, ~s, ~s, ~s, ~s,
+~s, ~s, ~s, ~s, ~s,
+~s
+)"
+                              home-p home-p-pv home-p-bat home-p-grid
+                              iv-state iv-limit iv-em-state iv-digi-in iv-p iv-freq iv-cosphi
+                              iv-l1-u iv-l1-i iv-l1-p iv-l2-u iv-l2-i iv-l2-p iv-l3-u iv-l3-i iv-l3-p
+                              pv1-u pv1-i pv1-p pv2-u pv2-i pv2-p
+                              bat-u bat-i bat-p bat-soc bat-cycles
+                              grid-p))))
 
 (define *process-args* #((("moduleid" . "devices:local")
-                          ("processdataids" . #("Home_P" "HomePv_P" "HomeBat_P" "HomeGrid_P" "EM_State" "DigitalIn" "LimitEvuAbs")))
+                          ("processdataids" . #("Home_P" "HomePv_P" "HomeBat_P" "HomeGrid_P" "EM_State" "DigitalIn" "LimitEvuAbs" "Inverter:State")))
                          (("moduleid" . "devices:local:pv1")
                           ("processdataids" . #("P" "I" "U")))
                          (("moduleid" . "devices:local:pv2")
@@ -165,9 +222,46 @@
         (dbi-close handle)))))
 
 (define (init handle)
-  (dbi-query handle "create table if not exists plenticore (
-home_p double precision
-)"))
+  (dbi-query handle "CREATE TABLE IF NOT EXISTS plenticore (
+  time        TIMESTAMPTZ NOT NULL,
+
+  home_p double precision not null,
+  home_p_pv double precision not null,
+  home_p_bat double precision not null,
+  home_p_grid double precision not null,
+
+  iv_state smallint not null,
+  iv_limit double precision not null,
+  iv_em_state smallint not null,
+  iv_digi_in bit(4) not null,
+  iv_p double precision not null,
+  iv_freq double precision not null,
+  iv_cosphi double precision not null,
+  iv_l1_u double precision not null,
+  iv_l1_i double precision not null,
+  iv_l1_p double precision not null,
+  iv_l2_u double precision not null,
+  iv_l2_i double precision not null,
+  iv_l2_p double precision not null,
+  iv_l3_u double precision not null,
+  iv_l3_i double precision not null,
+  iv_l3_p double precision not null,
+
+  pv1_u double precision not null,
+  pv1_i double precision not null,
+  pv1_p double precision not null,
+
+  pv2_u double precision not null,
+  pv2_i double precision not null,
+  pv2_p double precision not null,
+
+  bat_u double precision not null,
+  bat_i double precision not null,
+  bat_p double precision not null,
+  bat_soc smallint not null,
+  bat_cycles integer not null,
+
+  grid_p double precision not null ) WITH (timescaledb.hypertable);"))
 
 (define (observe cfg)
   (with-rfc5802-auth (assoc-ref cfg "password")
