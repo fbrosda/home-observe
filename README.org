@@ -19,12 +19,12 @@ The grafana folder contains the configs for various dashboards generated from th
 #+begin_src sql
 CREATE TABLE IF NOT EXISTS plenticore (
   time        TIMESTAMPTZ NOT NULL,
-    
+
   home_p double precision not null,
   home_p_pv double precision not null,
   home_p_bat double precision not null,
   home_p_grid double precision not null,
-  
+
   iv_state smallint not null,
   iv_limit double precision not null,
   iv_em_state smallint not null,
@@ -41,15 +41,15 @@ CREATE TABLE IF NOT EXISTS plenticore (
   iv_l3_u double precision not null,
   iv_l3_i double precision not null,
   iv_l3_p double precision not null,
-  
+
   pv1_u double precision not null,
   pv1_i double precision not null,
   pv1_p double precision not null,
-  
+
   pv2_u double precision not null,
   pv2_i double precision not null,
   pv2_p double precision not null,
-  
+
   bat_u double precision not null,
   bat_i double precision not null,
   bat_p double precision not null,
@@ -61,3 +61,50 @@ CREATE TABLE IF NOT EXISTS plenticore (
 ) WITH (timescaledb.hypertable);
 #+end_src
 
+* Grafana Setup
+
+[[https://grafana.com/tutorials/run-grafana-behind-a-proxy/][Official Documentation]]
+
+** Grafana Config
+#+begin_src
+[server]
+domain = example.com
+root_url = %(protocol)s://%(domain)s:%(http_port)s/grafana/
+serve_from_sub_path = true
+#+end_src
+
+** Nginx config
+#+begin_src nginx
+# This is required to proxy Grafana Live WebSocket connections.
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  '' close;
+}
+
+upstream grafana {
+  server localhost:3000;
+}
+
+server {
+  listen 80;
+  root /usr/share/nginx/www;
+  index index.html index.htm;
+
+  location /grafana/ {
+    proxy_set_header Host $host;
+    proxy_pass http://grafana;
+    rewrite  ^/grafana/(.*)  /$1 break;
+  }
+
+  # Proxy Grafana Live WebSocket connections.
+  location /grafana/api/live/ {
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_pass http://grafana;
+
+    rewrite  ^/grafana/(.*)  /$1 break;
+  }
+}
+#+end_src
