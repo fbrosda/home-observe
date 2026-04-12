@@ -1,0 +1,12 @@
+[Unit]
+Description=Home Observe Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/home-observe
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
