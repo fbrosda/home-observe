@@ -2,7 +2,7 @@ PREFIX = /usr
 BINDIR = $(PREFIX)/local/bin
 GUILE_VERSION = 3.0
 MODDIR = $(PREFIX)/share/guile/site/$(GUILE_VERSION)/home-observe
-MODULES = plenticore.scm aes.scm
+MODULES = plenticore.scm aes.scm util.scm idm.scm
 
 install:
 	install -m 755 main.scm $(BINDIR)/home-observe

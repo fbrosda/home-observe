@@ -5,6 +5,7 @@
   #:use-module (gcrypt mac)
   #:use-module (gcrypt random)
   #:use-module (home-observe aes)
+  #:use-module (home-observe util)
   #:use-module (ice-9 match)
   #:use-module (json)
   #:use-module (rnrs bytevectors)
@@ -233,16 +234,6 @@ grid_p
     (lambda (res body)
       (let ((data (json-string->scm (ensure-string body))))
         (storedata handle data)))))
-
-(define (with-dbi-handle cfg thunk)
-  (let ((handle #f))
-    (dynamic-wind
-      (lambda ()
-        (set! handle (dbi-open "postgresql" (assoc-ref cfg "connection"))))
-      (lambda ()
-        (thunk handle))
-      (lambda ()
-        (dbi-close handle)))))
 
 (define (init handle)
   (dbi-query handle "CREATE TABLE IF NOT EXISTS plenticore (
