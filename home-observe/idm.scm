@@ -20,6 +20,10 @@
       (lambda ()
         (close-websocket ws)))))
 
+;; TODO:
+;; - heatpump.performance.thermalPower
+;; - heatpump.performance.number
+;; - Store settings
 (define (storedata handle data)
   (let* ((system (assoc-ref data "system"))
          (heatpump (assoc-ref system "heatpump"))
