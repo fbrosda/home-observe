@@ -50,7 +50,7 @@ buffer
 ~a, ~s, ~s,
 ~s
 )"
-                              (if heatpump-active "true" "false") heatpump-flow heatpump-return heatpump-return
+                              (if heatpump-active "true" "false") heatpump-flow heatpump-return heatpump-source
                               (if heating-active "true" "false") heating-set heating-actual
                               (if circulation-active "true" "false") freshwater-top freshwater-bottom
                               buffer-temp))))
