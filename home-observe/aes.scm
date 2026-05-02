@@ -48,30 +48,33 @@
 
 (define (aes-gcm-encrypt key nonce plaintext)
   (let* ((ctx-ptr (make-bytevector (sizeof '*)))
-         (ctx (bytevector->pointer ctx-ptr)))
-
-    (gcry_cipher_open ctx GCRY_CIPHER_AES256 GCRY_CIPHER_MODE_GCM 0)
-    (set! ctx (dereference-pointer ctx))
-
-    (check (gcry_cipher_setkey ctx
-                               (bytevector->pointer key)
-                               (bytevector-length key))
-           "setkey error: ")
-    (check (gcry_cipher_setiv ctx
-                              (bytevector->pointer nonce)
-                              (bytevector-length nonce))
-           "setiv error: ")
-
-    (let* ((len (bytevector-length plaintext))
-           (ciphertext (make-bytevector len))
-           (tag (make-bytevector 16)))
-
-      (check (gcry_cipher_encrypt ctx
-                                  (bytevector->pointer ciphertext)
-                                  len
-                                  (bytevector->pointer plaintext)
-                                  len)
-             "encrypt error: ")
-      (gcry_cipher_gettag ctx (bytevector->pointer tag) 16)
-      (gcry_cipher_close ctx)
-      (values ciphertext tag))))
+         (ctx (bytevector->pointer ctx-ptr))
+         (opened? #f))
+    (dynamic-wind
+      (lambda ()
+        (gcry_cipher_open ctx GCRY_CIPHER_AES256 GCRY_CIPHER_MODE_GCM 0)
+        (set! opened? #t)
+        (set! ctx (dereference-pointer ctx))
+        (check (gcry_cipher_setkey ctx
+                                   (bytevector->pointer key)
+                                   (bytevector-length key))
+               "setkey error: ")
+        (check (gcry_cipher_setiv ctx
+                                  (bytevector->pointer nonce)
+                                  (bytevector-length nonce))
+               "setiv error: "))
+      (lambda ()
+        (let* ((len (bytevector-length plaintext))
+               (ciphertext (make-bytevector len))
+               (tag (make-bytevector 16)))
+          (check (gcry_cipher_encrypt ctx
+                                      (bytevector->pointer ciphertext)
+                                      len
+                                      (bytevector->pointer plaintext)
+                                      len)
+                 "encrypt error: ")
+          (gcry_cipher_gettag ctx (bytevector->pointer tag) 16)
+          (values ciphertext tag)))
+      (lambda ()
+        (when opened?
+          (gcry_cipher_close ctx))))))
