@@ -23,6 +23,21 @@
 (define *refresh-session* "/api/v2/auth/refresh")
 (define *processdata* "/api/v2/processdata")
 
+(define *api-headers* '((content-type application/json (charset . "utf-8"))
+                        (accept (application/json))
+                        (accept-encoding (1000 . "gzip") (1000 . "deflate"))))
+
+(define (api-post path body . maybe-headers)
+  (let ((headers (append (if (null? maybe-headers) '() (car maybe-headers))
+                         *api-headers*)))
+    (call-with-values
+        (lambda ()
+          (http-post (build-uri 'http #:host *host* #:path path)
+                     #:headers headers
+                     #:body body))
+      (lambda (res body)
+        (json-string->scm (ensure-string body))))))
+
 (define (scram-nonce n)
   (u8-list->bytevector (map (lambda (_) (random 256)) (iota n))))
 
@@ -46,49 +61,25 @@
                           ui))))))
 
 (define (auth-start client-nonce)
-  (call-with-values (lambda ()
-                    (http-post (build-uri 'http #:host *host* #:path *login-start*)
-                               #:headers '((content-type application/json (charset . "utf-8"))
-                                           (accept (application/json))
-                                           (accept-encoding (1000 . "gzip") (1000 . "deflate")))
-                               #:body (scm->json-string `(("username" . "user")
-                                                          ("nonce" . ,client-nonce)))))
-  (lambda (res body)
-    (json-string->scm (ensure-string body)))))
+  (api-post *login-start*
+            (scm->json-string `(("username" . "user")
+                                ("nonce" . ,client-nonce)))))
 
 (define (auth-finish client-proof transaction-id)
-  (call-with-values (lambda ()
-                      (http-post (build-uri 'http #:host *host* #:path *login-finish*)
-                                 #:headers '((content-type application/json (charset . "utf-8"))
-                                             (accept (application/json))
-                                             (accept-encoding (1000 . "gzip") (1000 . "deflate")))
-                                 #:body (scm->json-string `(("proof" . ,(base64-encode client-proof))
-                                                            ("transactionId" . ,(base64-encode transaction-id))))))
-    (lambda (res body)
-      (json-string->scm (ensure-string body)))))
+  (api-post *login-finish*
+            (scm->json-string `(("proof" . ,(base64-encode client-proof))
+                                ("transactionId" . ,(base64-encode transaction-id))))))
 
 (define (create-session session-nonce transaction-id cipher-text auth-tag)
-  (call-with-values (lambda ()
-                      (http-post (build-uri 'http #:host *host* #:path *create-session*)
-                                 #:headers '((content-type application/json (charset . "utf-8"))
-                                             (accept (application/json))
-                                             (accept-encoding (1000 . "gzip") (1000 . "deflate")))
-                                 #:body (scm->json-string `(("iv" . ,(base64-encode session-nonce))
-                                                            ("tag" . ,(base64-encode auth-tag))
-                                                            ("transactionId" . ,(base64-encode transaction-id))
-                                                            ("payload" . ,(base64-encode cipher-text))))))
-    (lambda (res body)
-      (json-string->scm (ensure-string body)))))
+  (api-post *create-session*
+            (scm->json-string `(("iv" . ,(base64-encode session-nonce))
+                                ("tag" . ,(base64-encode auth-tag))
+                                ("transactionId" . ,(base64-encode transaction-id))
+                                ("payload" . ,(base64-encode cipher-text))))))
 
 (define (refresh-session refresh-token)
-  (call-with-values (lambda ()
-                      (http-post (build-uri 'http #:host *host* #:path *refresh-session*)
-                                 #:headers '((content-type application/json (charset . "utf-8"))
-                                             (accept (application/json))
-                                             (accept-encoding (1000 . "gzip") (1000 . "deflate")))
-                                 #:body (scm->json-string `(("refresh_token" . ,refresh-token)))))
-    (lambda (res body)
-      (json-string->scm (ensure-string body)))))
+  (api-post *refresh-session*
+            (scm->json-string `(("refresh_token" . ,refresh-token)))))
 
 (define (with-rfc5802-auth pwd thunk)
   (let ((token #f)
@@ -135,7 +126,7 @@
         (lambda ()
           (let retry ()
             (guard (e (else
-                       (format #t "error: ~s~%" e)
+                       (log-error e)
                        (let* ((session (refresh-session refresh-token))
                               (new-token (assoc-ref session "token"))
                               (new-refresh (assoc-ref session "refreshToken")))
@@ -151,7 +142,7 @@
 
 (define (get-field data module field)
   (let ((module-value (assoc-ref (car (filter (lambda (elem) (string=? module (assoc-ref elem "moduleid"))) (vector->list data)))
-                                  "processdata")))
+                                 "processdata")))
     (assoc-ref (car (filter (lambda (elem) (string=? field (assoc-ref elem "id"))) (vector->list module-value)))
                "value")))
 
@@ -228,16 +219,10 @@ grid_p
                           ("processdataids" . #("P" "I" "U" "SoC" "Cycles")))))
 
 (define (processdata token handle)
-  (call-with-values (lambda ()
-                      (http-post (build-uri 'http #:host *host* #:path *processdata*)
-                                 #:headers `((content-type application/json (charset . "utf-8"))
-                                             (accept (application/json))
-                                             (accept-encoding (1000 . "gzip") (1000 . "deflate"))
-                                             (authorization . (bearer ,token)))
-                                 #:body (scm->json-string *process-args*)))
-    (lambda (res body)
-      (let ((data (json-string->scm (ensure-string body))))
-        (storedata handle data)))))
+  (let ((data (api-post *processdata*
+                        (scm->json-string *process-args*)
+                        `((authorization . (bearer ,token))))))
+    (storedata handle data)))
 
 (define (init handle)
   (dbi-query handle "CREATE TABLE IF NOT EXISTS plenticore (

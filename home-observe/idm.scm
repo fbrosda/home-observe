@@ -9,40 +9,57 @@
 
 (define upstream "ws://idm.fritz.box:61220/?auth_code=~a")
 
+(define (log-info fmt . args)
+  (apply format #t fmt args)
+  (newline))
+
 (define (with-websocket uri thunk)
   (let ((ws #f))
     (dynamic-wind
       (lambda ()
         (set! ws (open-websocket-for-uri uri))
-        (format #t "~s~%" (websocket-receive ws)))
+        (let ((greeting (websocket-receive ws)))
+          (log-info "idm websocket connected: ~a" greeting)))
       (lambda ()
         (thunk ws))
       (lambda ()
-        (close-websocket ws)))))
+        (when ws (close-websocket ws))))))
+
+(define (safe-ref data key)
+  (and data (assoc-ref data key)))
+
+(define (safe-string->number v)
+  (and v (string? v) (string->number v)))
 
 ;; TODO:
 ;; - heatpump.performance.thermalPower
 ;; - heatpump.performance.number
-;; - Store settings
 (define (storedata handle data)
-  (let* ((system (assoc-ref data "system"))
-         (heatpump (assoc-ref system "heatpump"))
-         (heatpump-active (assoc-ref heatpump "active"))
-         (heatpump-flow (string->number (assoc-ref (assoc-ref heatpump "temperatures") "flow")))
-         (heatpump-return (string->number (assoc-ref (assoc-ref heatpump "temperatures") "return")))
-         (heatpump-source (string->number (assoc-ref (assoc-ref (assoc-ref heatpump "source") "temperatures") "in")))
+  (let* ((system (safe-ref data "system"))
+         (heatpump (safe-ref system "heatpump"))
+         (heatpump-active (safe-ref heatpump "active"))
+         (heatpump-temps (safe-ref heatpump "temperatures"))
+         (heatpump-flow (safe-string->number (safe-ref heatpump-temps "flow")))
+         (heatpump-return (safe-string->number (safe-ref heatpump-temps "return")))
+         (heatpump-source-in (safe-ref (safe-ref (safe-ref heatpump "source") "temperatures") "in"))
+         (heatpump-source (safe-string->number heatpump-source-in))
 
-         (heating (vector-ref (assoc-ref system "heatingcircuit") 0))
-         (heating-active (assoc-ref heating "pumpActive"))
-         (heating-set (string->number (assoc-ref (assoc-ref heating "temperatures") "set")))
-         (heating-actual (string->number (assoc-ref (assoc-ref heating "temperatures") "actual")))
+         (heating-circuits (safe-ref system "heatingcircuit"))
+         (heating (and (vector? heating-circuits) (> (vector-length heating-circuits) 0)
+                       (vector-ref heating-circuits 0)))
+         (heating-active (safe-ref heating "pumpActive"))
+         (heating-temps (safe-ref heating "temperatures"))
+         (heating-set (safe-string->number (safe-ref heating-temps "set")))
+         (heating-actual (safe-string->number (safe-ref heating-temps "actual")))
 
-         (freshwater (assoc-ref system "freshwater"))
-         (circulation-active (assoc-ref (assoc-ref freshwater "circulation") "active"))
-         (freshwater-top (string->number (assoc-ref (assoc-ref freshwater "temperatures") "top")))
-         (freshwater-bottom (string->number (assoc-ref (assoc-ref freshwater "temperatures") "bottom")))
+         (freshwater (safe-ref system "freshwater"))
+         (circulation-active (safe-ref (safe-ref freshwater "circulation") "active"))
+         (freshwater-temps (safe-ref freshwater "temperatures"))
+         (freshwater-top (safe-string->number (safe-ref freshwater-temps "top")))
+         (freshwater-bottom (safe-string->number (safe-ref freshwater-temps "bottom")))
 
-         (buffer-temp (string->number (assoc-ref (assoc-ref (assoc-ref system "buffer") "temperatures") "heating"))))
+         (buffer-temp (safe-string->number
+                       (safe-ref (safe-ref (safe-ref system "buffer") "temperatures") "heating"))))
     (dbi-query handle (format #f "insert into idm (time,
 heatpump_active, heatpump_flow, heatpump_return, heatpump_source,
 heating_active, heating_set, heating_actual,
@@ -62,7 +79,7 @@ buffer
 (define (init handle)
   (dbi-query handle "CREATE TABLE IF NOT EXISTS idm (
   time        TIMESTAMPTZ NOT NULL,
-  
+
   heatpump_active boolean not null,
   heatpump_flow double precision not null,
   heatpump_return double precision not null,
@@ -80,14 +97,27 @@ buffer
    ) WITH (timescaledb.hypertable);"))
 
 (define (observe cfg)
-  (with-websocket (format #f upstream (assoc-ref cfg "password"))
-                  (lambda (ws)
-                    (with-dbi-handle cfg (lambda (handle)
-                                           (init handle)
-                                           (let loop ()
-                                             (websocket-send ws
-                                                             (scm->json-string '(("controller" . "system")
-                                                                                 ("command" . "overview"))))
-                                             (storedata handle (json-string->scm (websocket-receive ws)))
-                                             (sleep 10)
-                                             (loop)))))))
+  (let ((uri (format #f upstream (assoc-ref cfg "password"))))
+    (let loop ((delay 5))
+      (catch #t
+        (lambda ()
+          (with-websocket uri
+                          (lambda (ws)
+                            (with-dbi-handle cfg
+                                             (lambda (handle)
+                                               (init handle)
+                                               (let poll ()
+                                                 (guard (e (else
+                                                            (log-error e)
+                                                            (log-info "polling interrupted, closing websocket")))
+                                                   (websocket-send ws
+                                                                   (scm->json-string '(("controller" . "system")
+                                                                                       ("command" . "overview"))))
+                                                   (storedata handle (json-string->scm (websocket-receive ws))))
+                                                 (sleep 10)
+                                                 (poll)))))))
+        (lambda (key . args)
+          (log-error (make-condition key args))
+          (log-info "reconnecting in ~as" delay)
+          (sleep delay)
+          (loop (min (* delay 2) 120)))))))
