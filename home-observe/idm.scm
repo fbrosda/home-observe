@@ -31,9 +31,6 @@
 (define (safe-string->number v)
   (and v (string? v) (string->number v)))
 
-;; TODO:
-;; - heatpump.performance.thermalPower
-;; - heatpump.performance.number
 (define (storedata handle data)
   (let* ((system (safe-ref data "system"))
          (heatpump (safe-ref system "heatpump"))
@@ -43,6 +40,9 @@
          (heatpump-return (safe-string->number (safe-ref heatpump-temps "return")))
          (heatpump-source-in (safe-ref (safe-ref (safe-ref heatpump "source") "temperatures") "in"))
          (heatpump-source (safe-string->number heatpump-source-in))
+         (heatpump-perf (safe-ref heatpump "performance"))
+         (heatpump-thermal-power (safe-string->number (safe-ref heatpump-perf "thermalPower")))
+         (heatpump-perf-number (safe-string->number (safe-ref heatpump-perf "number")))
 
          (heating-circuits (safe-ref system "heatingcircuit"))
          (heating (and (vector? heating-circuits) (> (vector-length heating-circuits) 0)
@@ -62,16 +62,19 @@
                        (safe-ref (safe-ref (safe-ref system "buffer") "temperatures") "heating"))))
     (dbi-query handle (format #f "insert into idm (time,
 heatpump_active, heatpump_flow, heatpump_return, heatpump_source,
+heatpump_thermal_power, heatpump_perf_number,
 heating_active, heating_set, heating_actual,
 circulation_active, freshwater_top, freshwater_bottom,
 buffer
 ) values (now(),
 ~a, ~s, ~s, ~s,
+~a, ~a,
 ~a, ~s, ~s,
 ~a, ~s, ~s,
 ~s
 )"
                               (if heatpump-active "true" "false") heatpump-flow heatpump-return heatpump-source
+                              (or heatpump-thermal-power "null") (or heatpump-perf-number "null")
                               (if heating-active "true" "false") heating-set heating-actual
                               (if circulation-active "true" "false") freshwater-top freshwater-bottom
                               buffer-temp))))
@@ -84,6 +87,8 @@ buffer
   heatpump_flow double precision not null,
   heatpump_return double precision not null,
   heatpump_source double precision not null,
+  heatpump_thermal_power double precision,
+  heatpump_perf_number double precision,
 
   heating_active boolean not null,
   heating_set double precision not null,

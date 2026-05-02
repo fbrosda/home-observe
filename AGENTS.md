@@ -28,7 +28,7 @@ Guile Scheme 3.0 daemon that polls home devices (Kostal Plenticore PV inverter, 
 
 ## Dependencies
 
-Guile 3.0 modules: `dbi`, `gcrypt`, `json` (guile-json). `aes.c` provides the C FFI bindings.
+Guile 3.0 modules: `dbi`, `gcrypt`, `json` (guile-json). `home-observe/aes.scm` provides AES-GCM via libgcrypt C FFI (`system foreign`). `aes.c` is a standalone test file, not used.
 
 ## Error handling
 
@@ -41,5 +41,8 @@ Guile 3.0 modules: `dbi`, `gcrypt`, `json` (guile-json). `aes.c` provides the C 
 - Plenticore uses a custom SCRAM-based auth flow (not standard) with AES-GCM encrypted session tokens
 - `iv_digi_in` is stored as `bit(4)` — cast with `::bit(4)` in SQL
 - Polling interval is hardcoded to 10 seconds in both observers
+- IDM connects via `ws://` (unencrypted) on port `61220`; protocol is undocumented but used by Navigator web UI so likely complete
+- IDM WebSocket fields `heatpump.performance.thermalPower` and `heatpump.performance.number` are now captured (was TODO in `idm.scm`)
+- Modbus TCP (port 502) is the documented alternative: register maps exist for Navigator 2.0 (`812170_modbus-tcp_navigator-2-0.pdf`) and 10.0 (`812663_Rev.0`); must be enabled in heat pump under *Settings → Building Management → Modbus TCP: On*
 - Both tables created on first run via `CREATE TABLE IF NOT EXISTS` with TimescaleDB hypertable extension
 - No test suite exists
