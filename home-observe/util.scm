@@ -1,11 +1,12 @@
 (define-module (home-observe util)
   #:use-module (dbi dbi)
+  #:use-module (ice-9 exceptions)
   #:export (with-dbi-handle
             log-error))
 
 (define (log-error e)
   (let ((msg (catch #t
-               (lambda () (condition-ref e 'message))
+               (lambda () (exception-message e))
                (lambda _ #f))))
     (format #t "error: ~a\n" (or msg e))))
 
@@ -17,4 +18,6 @@
       (lambda ()
         (thunk handle))
       (lambda ()
-        (dbi-close handle)))))
+        (when handle
+          (dbi-close handle)
+          (set! handle #f))))))

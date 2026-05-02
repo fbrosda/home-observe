@@ -147,7 +147,6 @@
                "value")))
 
 (define (storedata handle data)
-  ;; (format #t "~s~%" data)
   (let* ((home-p (get-field data "devices:local" "Home_P"))
          (home-p-pv (get-field data "devices:local" "HomePv_P"))
          (home-p-bat (get-field data "devices:local" "HomeBat_P"))
