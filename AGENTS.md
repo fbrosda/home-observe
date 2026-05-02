@@ -13,30 +13,33 @@ Guile Scheme 3.0 daemon that polls home devices (Kostal Plenticore PV inverter, 
 ## Config
 
 - Read from `/etc/home-observe.cfg` as a Scheme s-expression (alist with `"plenticore"` and `"idm"` keys)
-- `"plenticore"` key contains a dbi connection spec and `"password"` for SCRAM auth
+- Each section contains: `"host"` (optional, defaults to `plenticore.fritz.box` / `idm.fritz.box`), `"password"`, and `"connection"` (dbi connection spec)
 - `home-observe.cfg` is gitignored (contains secrets)
 
 ## Architecture
 
-- `home-observe/main.scm` — entry point, spawns two threads (plenticore observer, idm observer)
-- `home-observe/plenticore.scm` — SCRAM auth + AES-GCM session encryption, polls inverter API every 10s, writes to `plenticore` hypertable
-- `home-observe/idm.scm` — IDM heatpump observer
-- `home-observe/aes.scm` — AES-GCM encrypt/decrypt (C FFI via `aes.c`)
-- `home-observe/util.scm` — dbi connection helper (`with-dbi-handle`)
+- `home-observe/main.scm` — entry point, spawns two threads with `run-observer` wrapper (top-level crash recovery with 5s restart)
+- `home-observe/plenticore.scm` — SCRAM auth + AES-GCM session encryption, polls inverter API, writes to `plenticore` hypertable
+- `home-observe/idm.scm` — WebSocket-based heatpump observer, writes to `idm` hypertable
+- `home-observe/aes.scm` — AES-GCM encrypt/decrypt (libgcrypt C FFI via `system foreign`)
+- `home-observe/util.scm` — `with-dbi-handle` and `log-error` helpers
 - `grafana/plenticore.json` — Grafana dashboard
 - `systemd/home-observe.service` — runs `/usr/local/bin/home-observe`, restarts on failure
 
 ## Dependencies
 
-Guile 3.0 modules: `dbi`, `gcrypt`, `json` (guile-json). C file `aes.c` is compiled as a Guile extension.
+Guile 3.0 modules: `dbi`, `gcrypt`, `json` (guile-json). `aes.c` provides the C FFI bindings.
+
+## Error handling
+
+- Each observer has a two-tier retry strategy: internal retry with exponential backoff (5s → 120s cap) for transient errors, plus `run-observer` in `main.scm` for full restart
+- Plenticore: `with-rfc5802-auth` has an outer `auth-loop` that restarts full SCRAM auth if the body exits (e.g. refresh fails). The inner `guard` covers the thunk and refresh attempt; if refresh throws, it propagates and triggers full re-auth
+- IDM: WebSocket connect/poll failures caught by outer `catch #t`, reconnect with same backoff pattern
 
 ## Key gotchas
 
 - Plenticore uses a custom SCRAM-based auth flow (not standard) with AES-GCM encrypted session tokens
-- `with-rfc5802-auth` has an outer `auth-loop` that restarts full SCRAM auth if the body exits (e.g. refresh-session fails)
-- The retry `guard` covers both the thunk and the refresh attempt. If refresh throws (expired token, connection refused), it propagates out and triggers full re-auth
-- Exponential backoff starts at 5s, doubles each retry, capped at 120s
-- The `plenticore` table is created on first run via `CREATE TABLE IF NOT EXISTS` with TimescaleDB hypertable extension
 - `iv_digi_in` is stored as `bit(4)` — cast with `::bit(4)` in SQL
-- Polling interval is hardcoded to 10 seconds in `plenticore.scm`
+- Polling interval is hardcoded to 10 seconds in both observers
+- Both tables created on first run via `CREATE TABLE IF NOT EXISTS` with TimescaleDB hypertable extension
 - No test suite exists

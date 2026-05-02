@@ -1,18 +1,51 @@
 #+title: Home Observability
 
-The project contains different components, to collect and monitor the following systems installed in my home:
+The project collects and monitors data from the following home systems:
 
 - Kostal Plenticore PV Inverter
 - IDM Heatpump
-- Airvisio
+- Airvisio (planned, [[https://www.airviso.de/wp-content/uploads/2025/07/airviso_ONE100_Bedienungs_und_Montageanleitung_09-2024.pdf][Bedienungs- und Montageanleitung]])
 
-There is a guile module, which connects to the different devices, via the available apis and collects the data, which is written into a timescaledb.
+A Guile Scheme 3.0 daemon connects to each device via its API, collects metrics at 10-second intervals, and writes them to TimescaleDB.
 
-The grafana folder contains the configs for various dashboards generated from the collected data.
+The ~grafana/~ folder contains dashboard configurations generated from the collected data.
+
+* Dependencies
+
+- Guile 3.0
+- Guile modules: ~dbi~, ~gcrypt~, ~guile-json~
+- libgcrypt (for AES-GCM encryption)
+- PostgreSQL / TimescaleDB
+
+* Build & Install
+
+#+begin_src sh
+make install   # installs binary, modules, and systemd service
+make uninstall # removes installed files
+#+end_src
+
+* Configuration
+
+Config is read from ~/etc/home-observe.cfg~ as a Scheme s-expression:
+
+#+begin_src scheme
+((plenticore
+  (host . "plenticore.fritz.box")      ;; optional, default shown
+  (password . "your-password")
+  (connection . "host=... dbname=... user=... password=..."))
+ (idm
+  (host . "idm.fritz.box")             ;; optional, default shown
+  (password . "your-auth-code")
+  (connection . "host=... dbname=... user=... password=...")))
+#+end_src
+
+The config file is gitignored as it contains secrets.
 
 * TimescaleDB Setup
 
-[[https://docs2.tigerdata.com/docs/get-started/choose-your-path/install-timescaledb][Official Documentation]]
+[[https://docs.timescale.com/self-hosted/latest/install/][Official Documentation]]
+
+Tables are created automatically on first run via ~CREATE TABLE IF NOT EXISTS~ with TimescaleDB hypertable extension.
 
 ** Plenticore Table
 
@@ -56,8 +89,30 @@ CREATE TABLE IF NOT EXISTS plenticore (
   bat_soc smallint not null,
   bat_cycles integer not null,
 
-  grid_state boolean not null,
   grid_p double precision not null
+) WITH (timescaledb.hypertable);
+#+end_src
+
+** IDM Table
+
+#+begin_src sql
+CREATE TABLE IF NOT EXISTS idm (
+  time        TIMESTAMPTZ NOT NULL,
+
+  heatpump_active boolean not null,
+  heatpump_flow double precision not null,
+  heatpump_return double precision not null,
+  heatpump_source double precision not null,
+
+  heating_active boolean not null,
+  heating_set double precision not null,
+  heating_actual double precision not null,
+
+  circulation_active boolean not null,
+  freshwater_top double precision not null,
+  freshwater_bottom double precision not null,
+
+  buffer double precision not null
 ) WITH (timescaledb.hypertable);
 #+end_src
 
