@@ -7,7 +7,8 @@
   #:use-module (web socket client)
   #:export (observe))
 
-(define upstream "ws://idm.fritz.box:61220/?auth_code=~a")
+(define (uri-for host password)
+  (format #f "ws://~a:61220/?auth_code=~a" host password))
 
 (define (log-info fmt . args)
   (apply format #t fmt args)
@@ -97,11 +98,12 @@ buffer
    ) WITH (timescaledb.hypertable);"))
 
 (define (observe cfg)
-  (let ((uri (format #f upstream (assoc-ref cfg "password"))))
+  (let ((host (or (assoc-ref cfg "host") "idm.fritz.box"))
+        (password (assoc-ref cfg "password")))
     (let loop ((delay 5))
       (catch #t
         (lambda ()
-          (with-websocket uri
+          (with-websocket (uri-for host password)
                           (lambda (ws)
                             (with-dbi-handle cfg
                                              (lambda (handle)

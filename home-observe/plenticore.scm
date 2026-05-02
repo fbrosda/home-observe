@@ -27,12 +27,12 @@
                         (accept (application/json))
                         (accept-encoding (1000 . "gzip") (1000 . "deflate"))))
 
-(define (api-post path body . maybe-headers)
+(define (api-post host path body . maybe-headers)
   (let ((headers (append (if (null? maybe-headers) '() (car maybe-headers))
                          *api-headers*)))
     (call-with-values
         (lambda ()
-          (http-post (build-uri 'http #:host *host* #:path path)
+          (http-post (build-uri 'http #:host host #:path path)
                      #:headers headers
                      #:body body))
       (lambda (res body)
@@ -60,35 +60,35 @@
                           (bytevector-xor res ui)
                           ui))))))
 
-(define (auth-start client-nonce)
-  (api-post *login-start*
+(define (auth-start host client-nonce)
+  (api-post host *login-start*
             (scm->json-string `(("username" . "user")
                                 ("nonce" . ,client-nonce)))))
 
-(define (auth-finish client-proof transaction-id)
-  (api-post *login-finish*
+(define (auth-finish host client-proof transaction-id)
+  (api-post host *login-finish*
             (scm->json-string `(("proof" . ,(base64-encode client-proof))
                                 ("transactionId" . ,(base64-encode transaction-id))))))
 
-(define (create-session session-nonce transaction-id cipher-text auth-tag)
-  (api-post *create-session*
+(define (create-session host session-nonce transaction-id cipher-text auth-tag)
+  (api-post host *create-session*
             (scm->json-string `(("iv" . ,(base64-encode session-nonce))
                                 ("tag" . ,(base64-encode auth-tag))
                                 ("transactionId" . ,(base64-encode transaction-id))
                                 ("payload" . ,(base64-encode cipher-text))))))
 
-(define (refresh-session refresh-token)
-  (api-post *refresh-session*
+(define (refresh-session host refresh-token)
+  (api-post host *refresh-session*
             (scm->json-string `(("refresh_token" . ,refresh-token)))))
 
-(define (with-rfc5802-auth pwd thunk)
+(define (with-rfc5802-auth host pwd thunk)
   (let ((token #f)
         (refresh-token #f))
     (let auth-loop ((delay 5))
       (dynamic-wind
         (lambda ()
           (let* ((client-nonce (base64-encode (scram-nonce 16)))
-                 (srv-start (auth-start client-nonce))
+                 (srv-start (auth-start host client-nonce))
                  (rounds (assoc-ref srv-start "rounds"))
                  (salt (base64-decode (assoc-ref srv-start "salt")))
                  (server-nonce (base64-decode (assoc-ref srv-start "nonce")))
@@ -107,7 +107,7 @@
                  (server-key (sign-data salted-pwd "Server Key" #:algorithm (mac-algorithm hmac-sha256)))
                  (server-signature (sign-data server-key auth-msg #:algorithm (mac-algorithm hmac-sha256)))
 
-                 (srv-finish (auth-finish client-proof transaction-id))
+                 (srv-finish (auth-finish host client-proof transaction-id))
                  (session-token (string->utf8 (assoc-ref srv-finish "token")))
                  (signature (base64-decode (assoc-ref srv-finish "signature")))
                  (session-key (if (equal? signature server-signature)
@@ -118,7 +118,7 @@
             (call-with-values (lambda ()
                                 (aes-gcm-encrypt session-key session-nonce session-token))
               (lambda (cipher-text auth-tag)
-                (let* ((session (create-session session-nonce transaction-id cipher-text auth-tag))
+                (let* ((session (create-session host session-nonce transaction-id cipher-text auth-tag))
                        (refreshToken (assoc-ref session "refreshToken"))
                        (authToken (assoc-ref session "token")))
                   (set! token (string->symbol authToken))
@@ -127,7 +127,7 @@
           (let retry ()
             (guard (e (else
                        (log-error e)
-                       (let* ((session (refresh-session refresh-token))
+                       (let* ((session (refresh-session host refresh-token))
                               (new-token (assoc-ref session "token"))
                               (new-refresh (assoc-ref session "refreshToken")))
                          (if (and new-token new-refresh)
@@ -218,8 +218,8 @@ grid_p
                          (("moduleid" . "devices:local:battery")
                           ("processdataids" . #("P" "I" "U" "SoC" "Cycles")))))
 
-(define (processdata token handle)
-  (let ((data (api-post *processdata*
+(define (processdata host token handle)
+  (let ((data (api-post host *processdata*
                         (scm->json-string *process-args*)
                         `((authorization . (bearer ,token))))))
     (storedata handle data)))
@@ -267,11 +267,12 @@ grid_p
   grid_p double precision not null ) WITH (timescaledb.hypertable);"))
 
 (define (observe cfg)
-  (with-rfc5802-auth (assoc-ref cfg "password")
-                     (lambda (token)
-                       (with-dbi-handle cfg (lambda (handle)
-                                              (init handle)
-                                              (let loop ()
-                                                (processdata token handle)
-                                                (sleep 10)
-                                                (loop)))))))
+  (let ((host (or (assoc-ref cfg "host") *host*)))
+    (with-rfc5802-auth host (assoc-ref cfg "password")
+                       (lambda (token)
+                         (with-dbi-handle cfg (lambda (handle)
+                                                (init handle)
+                                                (let loop ()
+                                                  (processdata host token handle)
+                                                  (sleep 10)
+                                                  (loop))))))))
