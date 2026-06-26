@@ -14,16 +14,20 @@
   (newline))
 
 (define (with-websocket uri thunk)
-  (let ((ws #f))
-    (dynamic-wind
-      (lambda ()
-        (set! ws (open-websocket-for-uri uri))
-        (let ((greeting (websocket-receive ws)))
-          (log-info "idm websocket connected: ~a" greeting)))
-      (lambda ()
-        (thunk ws))
-      (lambda ()
-        (when ws (close-websocket ws))))))
+  (let auth-loop ((delay 5))
+    (guard (e (else
+               (log-error e)
+               (auth-loop (min (* delay 2) 120))))
+      (let ((ws #f))
+        (dynamic-wind
+          (lambda ()
+            (set! ws (open-websocket-for-uri uri))
+            (let ((greeting (websocket-receive ws)))
+              (log-info "idm websocket connected: ~a" greeting)))
+          (lambda ()
+            (thunk ws))
+          (lambda ()
+            (when ws (close-websocket ws))))))))
 
 (define (safe-ref data key)
   (and data (assoc-ref data key)))
@@ -79,6 +83,17 @@ buffer, outside
                               (if circulation-active "true" "false") freshwater-top freshwater-bottom
                               buffer-temp outside-temp))))
 
+(define (processdata ws handle)
+  (let ((system-data (begin (websocket-send ws
+                                            (scm->json-string '(("controller" . "system")
+                                                                ("command" . "overview"))))
+                            (json-string->scm (websocket-receive ws))))
+        (home-data (begin (websocket-send ws
+                                          (scm->json-string '(("controller" . "home")
+                                                              ("command" . "detail"))))
+                          (json-string->scm (websocket-receive ws)))))
+    (storedata handle (safe-ref system-data "system") (safe-ref (safe-ref home-data "homeDetail") "data"))))
+
 (define (init handle)
   (dbi-query handle "CREATE TABLE IF NOT EXISTS idm (
   time        TIMESTAMPTZ NOT NULL,
@@ -105,31 +120,12 @@ buffer, outside
 (define (observe cfg)
   (let ((host (or (assoc-ref cfg "host") "idm.fritz.box"))
         (password (assoc-ref cfg "password")))
-    (let loop ((delay 5))
-      (catch #t
-        (lambda ()
-          (with-websocket (uri-for host password)
-                          (lambda (ws)
-                            (with-dbi-handle cfg
-                                             (lambda (handle)
-                                               (init handle)
-                                               (let poll ()
-                                                 (guard (e (else
-                                                            (log-error e)
-                                                            (log-info "polling interrupted, closing websocket")))
-                                                   (let ((system-data (begin (websocket-send ws
-                                                                                             (scm->json-string '(("controller" . "system")
-                                                                                                                 ("command" . "overview"))))
-                                                                             (json-string->scm (websocket-receive ws))))
-                                                         (home-data (begin (websocket-send ws
-                                                                                             (scm->json-string '(("controller" . "home")
-                                                                                                                 ("command" . "detail"))))
-                                                                           (json-string->scm (websocket-receive ws)))))
-                                                     (storedata handle (safe-ref system-data "system") (safe-ref (safe-ref home-data "homeDetail") "data"))))
-                                                 (sleep 10)
-                                                 (poll)))))))
-        (lambda (key . args)
-          (log-error (cons key args))
-          (log-info "reconnecting in ~as" delay)
-          (sleep delay)
-          (loop (min (* delay 2) 120)))))))
+    (with-websocket (uri-for host password)
+                    (lambda (ws)
+                      (with-dbi-handle cfg
+                                       (lambda (handle)
+                                         (init handle)
+                                         (let loop ()
+                                           (processdata ws handle)
+                                           (sleep 10)
+                                           (loop))))))))
