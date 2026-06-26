@@ -162,4 +162,4 @@ location /grafana/api/live/ {
 #+html: <img src="./img/kostal.png" />
 
 ** IDM Aero
-#+html: <img src="./img/kostal.png" />
+#+html: <img src="./img/idm.png" />
