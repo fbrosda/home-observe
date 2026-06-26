@@ -5,8 +5,8 @@
     "name": "adngpfd",
     "namespace": "default",
     "uid": "6aa548b7-b3ee-4184-a419-73471c897683",
-    "resourceVersion": "1782477124839006",
-    "generation": 19,
+    "resourceVersion": "1782490609917985",
+    "generation": 21,
     "creationTimestamp": "2026-04-26T10:45:05Z",
     "labels": {
       "grafana.app/deprecatedInternalID": "3718429947924480"
@@ -16,7 +16,7 @@
       "grafana.app/folder": "",
       "grafana.app/saved-from-ui": "Grafana v13.0.1 (a100054f)",
       "grafana.app/updatedBy": "user:afivdp1mxtjb4d",
-      "grafana.app/updatedTimestamp": "2026-06-26T12:32:04Z"
+      "grafana.app/updatedTimestamp": "2026-06-26T16:16:49Z"
     }
   },
   "spec": {
@@ -774,106 +774,24 @@
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.0.1",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "none",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-7": {
-        "kind": "Panel",
-        "spec": {
-          "id": 7,
-          "title": "Durchschnittliche Arbeitszahl",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
+              "transformations": [
                 {
-                  "kind": "PanelQuery",
+                  "kind": "Transformation",
+                  "group": "reduce",
                   "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "grafana-postgresql-datasource",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "dfivenv2iqdc0d"
-                      },
-                      "spec": {
-                        "dataset": "fb",
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "select avg(heatpump_perf_number) as \"Arbeitszahl\"\nfrom idm\nwhere $__timeFilter(time) and heatpump_perf_number is not null",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
+                    "options": {
+                      "includeTimeField": false,
+                      "mode": "reduceFields",
+                      "reducers": [
+                        "lastNotNull",
+                        "min",
+                        "mean",
+                        "max"
+                      ]
+                    }
                   }
                 }
               ],
-              "transformations": [],
               "queryOptions": {}
             }
           },
@@ -947,7 +865,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "select time_bucket('$__interval', time), avg(outside) as \"Außentemperatur\"\nfrom idm\nwhere $__timeFilter(time) \ngroup by 1\norder by 1",
+                        "rawSql": "select time_bucket('$__interval', time), avg(outside) as \"Außen\"\nfrom idm\nwhere $__timeFilter(time)\ngroup by 1\norder by 1",
                         "sql": {
                           "columns": [
                             {
@@ -975,48 +893,18 @@
               "transformations": [
                 {
                   "kind": "Transformation",
-                  "group": "calculateField",
+                  "group": "reduce",
                   "spec": {
                     "options": {
-                      "mode": "reduceRow",
-                      "reduce": {
-                        "include": [
-                          "Außentemperatur"
-                        ],
-                        "reducer": "min"
-                      },
-                      "replaceFields": false
-                    }
-                  }
-                },
-                {
-                  "kind": "Transformation",
-                  "group": "calculateField",
-                  "spec": {
-                    "options": {
-                      "alias": "",
-                      "mode": "reduceRow",
-                      "reduce": {
-                        "include": [
-                          "Außentemperatur"
-                        ],
-                        "reducer": "mean"
-                      }
-                    }
-                  }
-                },
-                {
-                  "kind": "Transformation",
-                  "group": "calculateField",
-                  "spec": {
-                    "options": {
-                      "mode": "reduceRow",
-                      "reduce": {
-                        "include": [
-                          "Außentemperatur"
-                        ],
-                        "reducer": "max"
-                      }
+                      "includeTimeField": false,
+                      "labelsToFields": false,
+                      "mode": "reduceFields",
+                      "reducers": [
+                        "lastNotNull",
+                        "min",
+                        "mean",
+                        "max"
+                      ]
                     }
                   }
                 }
@@ -1037,10 +925,10 @@
                 "percentChangeColorMode": "inverted",
                 "reduceOptions": {
                   "calcs": [
-                    "lastNotNull"
+                    "last"
                   ],
                   "fields": "",
-                  "values": false
+                  "values": true
                 },
                 "showPercentChange": false,
                 "text": {},
@@ -1050,6 +938,7 @@
               "fieldConfig": {
                 "defaults": {
                   "unit": "celsius",
+                  "decimals": 1,
                   "min": -30,
                   "max": 40,
                   "thresholds": {
@@ -1101,7 +990,7 @@
             "spec": {
               "x": 0,
               "y": 0,
-              "width": 4,
+              "width": 8,
               "height": 8,
               "element": {
                 "kind": "ElementReference",
@@ -1112,39 +1001,13 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 4,
+              "x": 8,
               "y": 0,
-              "width": 12,
+              "width": 16,
               "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-3"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 16,
-              "y": 0,
-              "width": 4,
-              "height": 8,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-6"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 20,
-              "y": 0,
-              "width": 4,
-              "height": 8,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-7"
               }
             }
           },
@@ -1191,6 +1054,19 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
+              "y": 20,
+              "width": 8,
+              "height": 11,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-6"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 8,
               "y": 20,
               "width": 8,
               "height": 12,
