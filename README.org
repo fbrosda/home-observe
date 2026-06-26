@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS idm (
   heatpump_flow double precision not null,
   heatpump_return double precision not null,
   heatpump_source double precision not null,
+  heatpump_thermal_power double precision,
+  heatpump_perf_number double precision,
 
   heating_active boolean not null,
   heating_set double precision not null,
@@ -113,6 +115,7 @@ CREATE TABLE IF NOT EXISTS idm (
   freshwater_bottom double precision not null,
 
   buffer double precision not null
+  outside double precision not null
 ) WITH (timescaledb.hypertable);
 #+end_src
 

@@ -31,9 +31,8 @@
 (define (safe-string->number v)
   (and v (string? v) (string->number v)))
 
-(define (storedata handle data)
-  (let* ((system (safe-ref data "system"))
-         (heatpump (safe-ref system "heatpump"))
+(define (storedata handle system home)
+  (let* ((heatpump (safe-ref system "heatpump"))
          (heatpump-active (safe-ref heatpump "active"))
          (heatpump-temps (safe-ref heatpump "temperatures"))
          (heatpump-flow (safe-string->number (safe-ref heatpump-temps "flow")))
@@ -59,25 +58,26 @@
          (freshwater-bottom (safe-string->number (safe-ref freshwater-temps "bottom")))
 
          (buffer-temp (safe-string->number
-                       (safe-ref (safe-ref (safe-ref system "buffer") "temperatures") "heating"))))
+                       (safe-ref (safe-ref (safe-ref system "buffer") "temperatures") "heating")))
+         (outside-temp (safe-string->number (safe-ref (safe-ref home "6") "outdoor"))))
     (dbi-query handle (format #f "insert into idm (time,
 heatpump_active, heatpump_flow, heatpump_return, heatpump_source,
 heatpump_thermal_power, heatpump_perf_number,
 heating_active, heating_set, heating_actual,
 circulation_active, freshwater_top, freshwater_bottom,
-buffer
+buffer, outside
 ) values (now(),
 ~a, ~s, ~s, ~s,
 ~a, ~a,
 ~a, ~s, ~s,
 ~a, ~s, ~s,
-~s
+~s, ~s
 )"
                               (if heatpump-active "true" "false") heatpump-flow heatpump-return heatpump-source
                               (or heatpump-thermal-power "null") (or heatpump-perf-number "null")
                               (if heating-active "true" "false") heating-set heating-actual
                               (if circulation-active "true" "false") freshwater-top freshwater-bottom
-                              buffer-temp))))
+                              buffer-temp outside-temp))))
 
 (define (init handle)
   (dbi-query handle "CREATE TABLE IF NOT EXISTS idm (
@@ -99,6 +99,7 @@ buffer
   freshwater_bottom double precision not null,
 
   buffer double precision not null
+  outside double precision not null
    ) WITH (timescaledb.hypertable);"))
 
 (define (observe cfg)
@@ -116,10 +117,15 @@ buffer
                                                  (guard (e (else
                                                             (log-error e)
                                                             (log-info "polling interrupted, closing websocket")))
-                                                   (websocket-send ws
-                                                                   (scm->json-string '(("controller" . "system")
-                                                                                       ("command" . "overview"))))
-                                                   (storedata handle (json-string->scm (websocket-receive ws))))
+                                                   (let ((system-data (begin (websocket-send ws
+                                                                                             (scm->json-string '(("controller" . "system")
+                                                                                                                 ("command" . "overview"))))
+                                                                             (json-string->scm (websocket-receive ws))))
+                                                         (home-data (begin (websocket-send ws
+                                                                                             (scm->json-string '(("controller" . "home")
+                                                                                                                 ("command" . "detail"))))
+                                                                           (json-string->scm (websocket-receive ws)))))
+                                                     (storedata handle (safe-ref system-data "system") (safe-ref (safe-ref home-data "homeDetail") "data"))))
                                                  (sleep 10)
                                                  (poll)))))))
         (lambda (key . args)
