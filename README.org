@@ -156,3 +156,10 @@ location /grafana/api/live/ {
     proxy_pass http://grafana;
 }
 #+end_src
+
+* Screenshots
+** Kostal Plenticore
+#+html: <img src="./img/kostal.png" />
+
+** IDM Aero
+#+html: <img src="./img/kostal.png" />
