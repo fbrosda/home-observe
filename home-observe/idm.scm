@@ -113,7 +113,7 @@ buffer, outside
   freshwater_top double precision not null,
   freshwater_bottom double precision not null,
 
-  buffer double precision not null
+  buffer double precision not null,
   outside double precision not null
    ) WITH (timescaledb.hypertable);"))
 
