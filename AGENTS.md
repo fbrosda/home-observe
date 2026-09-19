@@ -43,6 +43,7 @@ Guile 3.0 modules: `dbi`, `gcrypt`, `json` (guile-json). `home-observe/aes.scm` 
 - Polling interval is hardcoded to 10 seconds in both observers
 - IDM connects via `ws://` (unencrypted) on port `61220`; protocol is undocumented but used by Navigator web UI so likely complete
 - IDM WebSocket fields `heatpump.performance.thermalPower` and `heatpump.performance.number` are now captured (was TODO in `idm.scm`)
+- IDM heatpump demand reason ("why is it running", `RD_REQ_*`) is captured as raw `heatpump_info` (bitmask) + `heatpump_operation_mode` columns in `idm`; decode per mode 1/2/4 tables documented in `idm-websocket.md` (Grafana SQL) — `system.heatpump.info` is only present while the heatpump is running
 - Modbus TCP (port 502) is the documented alternative: register maps exist for Navigator 2.0 (`812170_modbus-tcp_navigator-2-0.pdf`) and 10.0 (`812663_Rev.0`); must be enabled in heat pump under *Settings → Building Management → Modbus TCP: On*
 - Both tables created on first run via `CREATE TABLE IF NOT EXISTS` with TimescaleDB hypertable extension
 - No test suite exists

@@ -35,6 +35,11 @@
 (define (safe-string->number v)
   (and v (string? v) (string->number v)))
 
+(define (safe-number v)
+  (cond ((number? v) v)
+        ((string? v) (string->number v))
+        (else #f)))
+
 (define (storedata handle system home)
   (let* ((heatpump (safe-ref system "heatpump"))
          (heatpump-active (safe-ref heatpump "active"))
@@ -46,6 +51,8 @@
          (heatpump-perf (safe-ref heatpump "performance"))
          (heatpump-thermal-power (safe-string->number (safe-ref heatpump-perf "thermalPower")))
          (heatpump-perf-number (safe-string->number (safe-ref heatpump-perf "number")))
+         (heatpump-info (safe-number (safe-ref heatpump "info")))
+         (heatpump-operation-mode (safe-number (safe-ref heatpump "operationMode")))
 
          (heating-circuits (safe-ref system "heatingcircuit"))
          (heating (and (vector? heating-circuits) (> (vector-length heating-circuits) 0)
@@ -69,19 +76,22 @@ heatpump_active, heatpump_flow, heatpump_return, heatpump_source,
 heatpump_thermal_power, heatpump_perf_number,
 heating_active, heating_set, heating_actual,
 circulation_active, freshwater_top, freshwater_bottom,
-buffer, outside
+buffer, outside,
+heatpump_info, heatpump_operation_mode
 ) values (now(),
 ~a, ~s, ~s, ~s,
 ~a, ~a,
 ~a, ~s, ~s,
 ~a, ~s, ~s,
-~s, ~s
+~s, ~s,
+~a, ~a
 )"
                               (if heatpump-active "true" "false") heatpump-flow heatpump-return heatpump-source
                               (or heatpump-thermal-power "null") (or heatpump-perf-number "null")
                               (if heating-active "true" "false") heating-set heating-actual
                               (if circulation-active "true" "false") freshwater-top freshwater-bottom
-                              buffer-temp outside-temp))))
+                              buffer-temp outside-temp
+                              (or heatpump-info "null") (or heatpump-operation-mode "null")))))
 
 (define (processdata ws handle)
   (let ((system-data (begin (websocket-send ws
@@ -114,8 +124,14 @@ buffer, outside
   freshwater_bottom double precision not null,
 
   buffer double precision not null,
-  outside double precision not null
-   ) WITH (timescaledb.hypertable);"))
+  outside double precision not null,
+
+  heatpump_info integer,
+  heatpump_operation_mode integer
+   ) WITH (timescaledb.hypertable);")
+  ;; existing databases: CREATE TABLE IF NOT EXISTS does not add columns
+  (dbi-query handle "ALTER TABLE idm ADD COLUMN IF NOT EXISTS heatpump_info integer;")
+  (dbi-query handle "ALTER TABLE idm ADD COLUMN IF NOT EXISTS heatpump_operation_mode integer;"))
 
 (define (observe cfg)
   (let ((host (or (assoc-ref cfg "host") "idm.fritz.box"))
