@@ -5,8 +5,8 @@
     "name": "adngpfd",
     "namespace": "default",
     "uid": "6aa548b7-b3ee-4184-a419-73471c897683",
-    "resourceVersion": "1789910880843012",
-    "generation": 33,
+    "resourceVersion": "1794052795867011",
+    "generation": 34,
     "creationTimestamp": "2026-04-26T10:45:05Z",
     "labels": {
       "grafana.app/deprecatedInternalID": "3718429947924480"
@@ -16,7 +16,7 @@
       "grafana.app/folder": "",
       "grafana.app/saved-from-ui": "Grafana v13.1.0 (b309c9bb3b)",
       "grafana.app/updatedBy": "user:afivdp1mxtjb4d",
-      "grafana.app/updatedTimestamp": "2026-09-20T13:28:00Z"
+      "grafana.app/updatedTimestamp": "2026-11-07T11:59:55Z"
     }
   },
   "spec": {
@@ -209,7 +209,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "select\n  time,\n  case\n    when heatpump_operation_mode = 0\n    or heatpump_info is null then 'keine Anforderung'\n    when (heatpump_info & -2) <> 0\n    and (\n      (heatpump_info & -2) & ((heatpump_info & -2) - 1)\n    ) <> 0 then 'Mehrere Anford.'\n    when heatpump_operation_mode = 1 then 'Heizen'\n    when heatpump_operation_mode = 2 then 'Kühlen'\n    when heatpump_operation_mode = 4 then 'Warmwasser'\n    else 'unbekannt'\n  end \"Modus\",\n  case\n    when heatpump_operation_mode = 1 then case\n      when (heatpump_info & 2) = 2 then 'keine Anforderung'\n      when (heatpump_info & 4) = 4 then 'Externe Anforderung'\n      when (heatpump_info & 8) = 8 then 'Externe Anforderung'\n      when (heatpump_info & 16) = 16 then 'Systemkühlung'\n      when (heatpump_info & 32) = 32 then 'PV-Regelung'\n      when (heatpump_info & 64) = 64 then 'Frostschutzbetrieb'\n      when (heatpump_info & 128) = 128 then 'Anforderung HK A'\n      when (heatpump_info & 256) = 256 then 'Anforderung HK B'\n      when (heatpump_info & 512) = 512 then 'Anforderung HK C'\n      when (heatpump_info & 1024) = 1024 then 'Anforderung HK D'\n      when (heatpump_info & 2048) = 2048 then 'Anforderung HK E'\n      when (heatpump_info & 4096) = 4096 then 'Anforderung HK F'\n      when (heatpump_info & 8192) = 8192 then 'Anforderung HK G'\n      when (heatpump_info & 16384) = 16384 then 'System ausgeschaltet'\n      when (heatpump_info & 32768) = 32768 then 'iON controlled'\n      when (heatpump_info & 65536) = 65536 then 'Booster Anforderung'\n      else 'unbekannt'\n    end\n    when heatpump_operation_mode = 2 then case\n      when (heatpump_info & 2) = 2 then 'keine Anforderung'\n      when (heatpump_info & 4) = 4 then 'Externe Anforderung'\n      when (heatpump_info & 8) = 8 then 'Externe Anforderung'\n      when (heatpump_info & 16) = 16 then 'PV-Regelung'\n      when (heatpump_info & 128) = 128 then 'Anforderung HK A'\n      when (heatpump_info & 256) = 256 then 'Anforderung HK B'\n      when (heatpump_info & 512) = 512 then 'Anforderung HK C'\n      when (heatpump_info & 1024) = 1024 then 'Anforderung HK D'\n      when (heatpump_info & 2048) = 2048 then 'Anforderung HK E'\n      when (heatpump_info & 4096) = 4096 then 'Anforderung HK F'\n      when (heatpump_info & 8192) = 8192 then 'Anforderung HK G'\n      when (heatpump_info & 16384) = 16384 then 'System ausgeschaltet'\n      when (heatpump_info & 32768) = 32768 then 'iON controlled'\n      else 'unbekannt'\n    end\n    when heatpump_operation_mode = 4 then case\n      when (heatpump_info & 2) = 2 then 'Einmalige Ladung'\n      when (heatpump_info & 4) = 4 then 'Einmalige Boostladung'\n      when (heatpump_info & 8) = 8 then 'Externe Anforderung'\n      when (heatpump_info & 16) = 16 then 'Externe Anforderung'\n      when (heatpump_info & 32) = 32 then 'PV-Regelung'\n      when (heatpump_info & 64) = 64 then 'Systemkühlung'\n      when (heatpump_info & 128) = 128 then 'Zeitprogramm'\n      when (heatpump_info & 256) = 256 then 'Zeitprogramm (Boost)'\n      when (heatpump_info & 512) = 512 then 'System ausgeschaltet'\n      when (heatpump_info & 1024) = 1024 then 'Komfortladung'\n      when (heatpump_info & 2048) = 2048 then 'iON controlled'\n      when (heatpump_info & 4096) = 4096 then 'Anforderung Kaskade'\n      when (heatpump_info & 8192) = 8192 then 'Booster Anforderung'\n      else 'unbekannt'\n    end\n    else ''\n  end as \"Anforderungsgrund\"\nfrom\n  (\n    select\n      time_bucket('$__interval', time) as time,\n      mode() WITHIN GROUP (\n        order by\n          heatpump_operation_mode\n      ) as heatpump_operation_mode,\n      mode() WITHIN GROUP (\n        order by\n          heatpump_info\n      ) as heatpump_info\n    from\n      idm\n    where\n      $__timeFilter(time)\n    group by\n      1\n  );",
+                        "rawSql": "select\n  time,\n  case\n    \n    when heatpump_operation_mode = 0 then 'keine Anforderung'\n    when (heatpump_info & -2) <> 0\n    and (\n      (heatpump_info & -2) & ((heatpump_info & -2) - 1)\n    ) <> 0 then 'Mehrere Anford.'\n    when heatpump_operation_mode = 1 then 'Heizen'\n    when heatpump_operation_mode = 2 then 'Kühlen'\n    when heatpump_operation_mode = 4 then 'Warmwasser'\n    when heatpump_operation_mode = 8 then 'Abtauen'\n    else 'unbekannt'\n  end \"Modus\",\n  case\n    when heatpump_operation_mode = 1 then case\n      when (heatpump_info & 2) = 2 then 'keine Anforderung'\n      when (heatpump_info & 4) = 4 then 'Externe Anforderung'\n      when (heatpump_info & 8) = 8 then 'Externe Anforderung'\n      when (heatpump_info & 16) = 16 then 'Systemkühlung'\n      when (heatpump_info & 32) = 32 then 'PV-Regelung'\n      when (heatpump_info & 64) = 64 then 'Frostschutzbetrieb'\n      when (heatpump_info & 128) = 128 then 'Anforderung HK A'\n      when (heatpump_info & 256) = 256 then 'Anforderung HK B'\n      when (heatpump_info & 512) = 512 then 'Anforderung HK C'\n      when (heatpump_info & 1024) = 1024 then 'Anforderung HK D'\n      when (heatpump_info & 2048) = 2048 then 'Anforderung HK E'\n      when (heatpump_info & 4096) = 4096 then 'Anforderung HK F'\n      when (heatpump_info & 8192) = 8192 then 'Anforderung HK G'\n      when (heatpump_info & 16384) = 16384 then 'System ausgeschaltet'\n      when (heatpump_info & 32768) = 32768 then 'iON controlled'\n      when (heatpump_info & 65536) = 65536 then 'Booster Anforderung'\n      else 'unbekannt'\n    end\n    when heatpump_operation_mode = 2 then case\n      when (heatpump_info & 2) = 2 then 'keine Anforderung'\n      when (heatpump_info & 4) = 4 then 'Externe Anforderung'\n      when (heatpump_info & 8) = 8 then 'Externe Anforderung'\n      when (heatpump_info & 16) = 16 then 'PV-Regelung'\n      when (heatpump_info & 128) = 128 then 'Anforderung HK A'\n      when (heatpump_info & 256) = 256 then 'Anforderung HK B'\n      when (heatpump_info & 512) = 512 then 'Anforderung HK C'\n      when (heatpump_info & 1024) = 1024 then 'Anforderung HK D'\n      when (heatpump_info & 2048) = 2048 then 'Anforderung HK E'\n      when (heatpump_info & 4096) = 4096 then 'Anforderung HK F'\n      when (heatpump_info & 8192) = 8192 then 'Anforderung HK G'\n      when (heatpump_info & 16384) = 16384 then 'System ausgeschaltet'\n      when (heatpump_info & 32768) = 32768 then 'iON controlled'\n      else 'unbekannt'\n    end\n    when heatpump_operation_mode = 4 then case\n      when (heatpump_info & 2) = 2 then 'Einmalige Ladung'\n      when (heatpump_info & 4) = 4 then 'Einmalige Boostladung'\n      when (heatpump_info & 8) = 8 then 'Externe Anforderung'\n      when (heatpump_info & 16) = 16 then 'Externe Anforderung'\n      when (heatpump_info & 32) = 32 then 'PV-Regelung'\n      when (heatpump_info & 64) = 64 then 'Systemkühlung'\n      when (heatpump_info & 128) = 128 then 'Zeitprogramm'\n      when (heatpump_info & 256) = 256 then 'Zeitprogramm (Boost)'\n      when (heatpump_info & 512) = 512 then 'System ausgeschaltet'\n      when (heatpump_info & 1024) = 1024 then 'Komfortladung'\n      when (heatpump_info & 2048) = 2048 then 'iON controlled'\n      when (heatpump_info & 4096) = 4096 then 'Anforderung Kaskade'\n      when (heatpump_info & 8192) = 8192 then 'Booster Anforderung'\n      else 'unbekannt'\n    end\n    when heatpump_operation_mode = 8 then 'Abtauen'\n    else ''\n  end as \"Anforderungsgrund\"\nfrom\n  (\n    select\n      time_bucket('$__interval', time) as time,\n      mode() WITHIN GROUP (\n        order by\n          heatpump_operation_mode\n      ) as heatpump_operation_mode,\n      mode() WITHIN GROUP (\n        order by\n          heatpump_info\n      ) as heatpump_info\n    from\n      idm\n    where\n      $__timeFilter(time)\n    group by\n      1\n  );",
                         "sql": {
                           "columns": [
                             {
@@ -271,9 +271,13 @@
                     {
                       "type": "value",
                       "options": {
+                        "Abtauen": {
+                          "color": "light-blue",
+                          "index": 3
+                        },
                         "Anforderung HK A": {
                           "color": "orange",
-                          "index": 4
+                          "index": 5
                         },
                         "Heizen": {
                           "color": "dark-red",
@@ -285,7 +289,7 @@
                         },
                         "PV-Regelung": {
                           "color": "yellow",
-                          "index": 3
+                          "index": 4
                         },
                         "Warmwasser": {
                           "color": "dark-purple",
@@ -293,11 +297,11 @@
                         },
                         "Zeitprogramm": {
                           "color": "red",
-                          "index": 5
+                          "index": 6
                         },
                         "keine Anforderung": {
                           "color": "text",
-                          "index": 6
+                          "index": 7
                         }
                       }
                     },
@@ -307,7 +311,7 @@
                         "match": "empty",
                         "result": {
                           "color": "transparent",
-                          "index": 7
+                          "index": 8
                         }
                       }
                     }
